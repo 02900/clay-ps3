@@ -11,10 +11,20 @@ Contents:
 | `clay.h`          | upstream   | Vendored single-header Clay (do not edit; re-vendor). |
 | `clay_renderer.h` | this repo  | Backend public API.                                   |
 | `clay_renderer.c` | this repo  | Maps Clay render commands to YA2D + the TTF renderer. |
+| `clay_nav.h`      | this repo  | Gamepad focus & directional-navigation helper API.    |
+| `clay_nav.c`      | this repo  | Focus model on top of Clay (no input/render deps).    |
 
 This is **layout-only**: Clay computes positions/sizes; you navigate with the gamepad.
 The backend draws RECTANGLE / BORDER / TEXT / IMAGE commands. SCISSOR / OVERLAY /
 CUSTOM are no-ops (extend `clay_render()` if you add scrolling/clipping).
+
+## Gamepad navigation
+
+Clay has no built-in focus system. The `clay_nav` helper adds an app-managed focus model
+(register focusables per frame, move with the D-pad/stick via element geometry, highlight
+the focused one). See **[docs/GAMEPAD-NAVIGATION.md](docs/GAMEPAD-NAVIGATION.md)** for the
+full guidelines, patterns, and a minimal end-to-end example. `clay_nav` depends only on
+`clay.h` — no PSL1GHT/YA2D — so input and rendering stay in your project.
 
 ## Requirements in the consuming project
 
