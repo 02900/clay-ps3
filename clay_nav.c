@@ -152,14 +152,15 @@ void clay_nav_move(ClayNav *nav, ClayNavDir dir) {
             }
             Clay_Vector2 to = clay_nav__center(cd.boundingBox);
 
-            /* Score = how far toward the opposite edge (primary) + alignment (perp).
-             * e.g. pressing DOWN with nothing below -> pick the topmost (min y). */
+            /* Score (minimized) = distance toward the opposite edge + alignment (perp).
+             * Pressing DOWN with nothing below wraps to the top-most element (min y);
+             * UP wraps to the bottom-most (max y); LEFT -> right-most; RIGHT -> left-most. */
             float primary, perp;
             switch (dir) {
-                case CLAY_NAV_UP:    primary =  to.y; perp = clay_nav__absf(to.x - from.x); break;
-                case CLAY_NAV_DOWN:  primary = -to.y; perp = clay_nav__absf(to.x - from.x); break;
-                case CLAY_NAV_LEFT:  primary =  to.x; perp = clay_nav__absf(to.y - from.y); break;
-                case CLAY_NAV_RIGHT: primary = -to.x; perp = clay_nav__absf(to.y - from.y); break;
+                case CLAY_NAV_UP:    primary = -to.y; perp = clay_nav__absf(to.x - from.x); break;
+                case CLAY_NAV_DOWN:  primary =  to.y; perp = clay_nav__absf(to.x - from.x); break;
+                case CLAY_NAV_LEFT:  primary = -to.x; perp = clay_nav__absf(to.y - from.y); break;
+                case CLAY_NAV_RIGHT: primary =  to.x; perp = clay_nav__absf(to.y - from.y); break;
                 default: continue;
             }
 

@@ -257,6 +257,10 @@ The left stick should navigate too. PSL1GHT reports axes 0–255, centered at 12
 
 ```c
 static ClayNavDir read_stick_direction(const padData *p) {
+    // A centered stick reads ~128. Both axes at exactly 0 means "no analog data"
+    // (pad not read yet / digital mode), NOT full up-left -> ignore it, otherwise
+    // the menu auto-navigates on startup.
+    if (p->ANA_L_H == 0 && p->ANA_L_V == 0) return CLAY_NAV_NONE;
     int dx = (int)p->ANA_L_H - 128;   // -128..127
     int dy = (int)p->ANA_L_V - 128;
     const int DEAD = 48;              // ignore small tilts
