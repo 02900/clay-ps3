@@ -15,8 +15,8 @@ Contents:
 | `clay_nav.c`      | this repo  | Focus model on top of Clay (no input/render deps).    |
 
 This is **layout-only**: Clay computes positions/sizes; you navigate with the gamepad.
-The backend draws RECTANGLE / BORDER / TEXT / IMAGE commands. SCISSOR / OVERLAY /
-CUSTOM are no-ops (extend `clay_render()` if you add scrolling/clipping).
+The backend draws RECTANGLE / BORDER / TEXT / IMAGE commands and honors SCISSOR_START/END
+(clip/scroll containers are clipped via the RSX scissor). OVERLAY / CUSTOM are no-ops.
 
 ## Gamepad navigation
 

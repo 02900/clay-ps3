@@ -51,6 +51,38 @@ void clay_nav_focus(ClayNav *nav, Clay_ElementId id) {
     nav->has_focus = true;
 }
 
+Clay_Vector2 clay_nav_scroll_into_view(const ClayNav *nav, Clay_ElementId viewport,
+                                       Clay_Vector2 offset, float margin)
+{
+    if (!nav->has_focus) {
+        return offset;
+    }
+
+    Clay_ElementData v = Clay_GetElementData(viewport);
+    Clay_ElementData f = Clay_GetElementData(nav->focused);
+    if (!v.found || !f.found) {
+        return offset;
+    }
+
+    /* boundingBox is the on-screen (post-offset) rect, so the delta needed to bring
+     * the focused element into the viewport applies directly to childOffset. */
+    float ftop = f.boundingBox.y - margin;
+    float fbot = f.boundingBox.y + f.boundingBox.height + margin;
+    float vtop = v.boundingBox.y;
+    float vbot = v.boundingBox.y + v.boundingBox.height;
+    if (ftop < vtop)      offset.y += (vtop - ftop);
+    else if (fbot > vbot) offset.y -= (fbot - vbot);
+
+    float fleft  = f.boundingBox.x - margin;
+    float fright = f.boundingBox.x + f.boundingBox.width + margin;
+    float vleft  = v.boundingBox.x;
+    float vright = v.boundingBox.x + v.boundingBox.width;
+    if (fleft < vleft)       offset.x += (vleft - fleft);
+    else if (fright > vright) offset.x -= (fright - vright);
+
+    return offset;
+}
+
 void clay_nav_move(ClayNav *nav, ClayNavDir dir) {
     if (dir == CLAY_NAV_NONE || nav->count == 0) {
         return;

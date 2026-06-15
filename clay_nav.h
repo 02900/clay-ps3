@@ -70,6 +70,16 @@ void clay_nav_move(ClayNav *nav, ClayNavDir dir);
  * Pass an id you also register via clay_nav_add the same frame. */
 void clay_nav_focus(ClayNav *nav, Clay_ElementId id);
 
+/* Keep the focused element inside a scroll/clip container's viewport.
+ * `viewport` is the clip container's element id; `offset` is the scroll offset you
+ * own and feed to its .clip.childOffset; `margin` is px of padding to keep visible
+ * around the focused element. Returns the adjusted offset. Uses previous-frame
+ * geometry, so call after clay_nav_move and before building the layout. No-op (returns
+ * `offset` unchanged) if the focused element or the viewport has no known box yet, so
+ * only call it when the focused element actually lives inside this container. */
+Clay_Vector2 clay_nav_scroll_into_view(const ClayNav *nav, Clay_ElementId viewport,
+                                       Clay_Vector2 offset, float margin);
+
 /* Auto-repeat for held directions (D-pad or analog mapped to a direction).
  * Call once per frame with the direction currently held (CLAY_NAV_NONE if none).
  * Returns the direction that should "fire" this frame: immediately on a fresh

@@ -387,38 +387,49 @@ Rules:
 
 ## 10. Scrolling & Bring-Focus-Into-View
 
-When content is taller/wider than its container, use a Clay clip (scroll) container and
-offset its children. On PS3 there's no scroll wheel, so **you manage the scroll offset as
-app state** and move it when focus leaves the viewport.
+When content is taller/wider than its container, use a Clay **clip (scroll) container** and
+offset its children. On PS3 there's no scroll wheel, so **you own the scroll offset as app
+state** and move it so the focused element stays visible. The `clay-ps3` backend implements
+SCISSOR_START/END, so a clip container actually clips its overflow (content outside the
+viewport is not drawn).
+
+Give the list a bounded size and a clip with a `childOffset` you control, and register every
+item as focusable (so directional nav can reach them all — Clay still lays them all out, the
+backend just clips what's off-screen):
 
 ```c
-static float scroll_y = 0.0f;   // app state
+static Clay_Vector2 scroll = {0};   // app state: the list's scroll offset
+
+// per frame, AFTER clay_nav_move and BEFORE building the layout:
+// only adjust when the focused element is actually inside this list
+bool focus_in_list = /* is nav.focused one of this list's item ids? */;
+if (focus_in_list)
+    scroll = clay_nav_scroll_into_view(&nav, CLAY_ID("list"), scroll, /*margin*/ 8.0f);
 
 CLAY(CLAY_ID("list"), {
-    .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_GROW(0) },
-                .layoutDirection = CLAY_TOP_TO_BOTTOM, .childGap = 8 },
-    .clip = { .vertical = true, .childOffset = (Clay_Vector2){ 0, scroll_y } },
-}) { /* items ... */ }
-```
-
-After moving focus, nudge `scroll_y` so the focused box sits inside the list box (both come
-from `Clay_GetElementData`, in absolute coordinates):
-
-```c
-Clay_ElementData list = Clay_GetElementData(CLAY_ID("list"));
-Clay_ElementData foc  = Clay_GetElementData(nav.focused);
-if (list.found && foc.found) {
-    float top    = foc.boundingBox.y;
-    float bottom = top + foc.boundingBox.height;
-    float vtop    = list.boundingBox.y;
-    float vbottom = vtop + list.boundingBox.height;
-    if (top    < vtop)    scroll_y += (vtop - top);          // scrolled above -> reveal
-    if (bottom > vbottom) scroll_y -= (bottom - vbottom);    // scrolled below -> reveal
+    .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(360) },
+                .layoutDirection = CLAY_TOP_TO_BOTTOM, .childGap = 6 },
+    .clip = { .vertical = true, .childOffset = scroll },
+}) {
+    for (int i = 0; i < count; i++) {
+        Clay_ElementId id = CLAY_IDI("item", i);
+        clay_nav_add(&nav, id);
+        bool f = clay_nav_is_focused(&nav, id);
+        CLAY(id, { .layout = { .sizing = { CLAY_SIZING_GROW(0), CLAY_SIZING_FIXED(40) } },
+                   .backgroundColor = f ? ROW_FOCUS : ROW }) { /* ... */ }
+    }
 }
 ```
 
+`clay_nav_scroll_into_view` reads the focused element's and the viewport's previous-frame
+boxes (which already include the current offset) and nudges the offset by exactly the amount
+needed to bring the focused element fully inside — so it converges in one frame and doesn't
+over-scroll. Guard it with `focus_in_list` so navigating a *different* region doesn't scroll
+this list.
+
 > `childOffset` is normally fed by `Clay_GetScrollOffset()` (pointer/drag driven). For
-> gamepad UIs, drive it yourself as above; don't call `Clay_UpdateScrollContainers()`.
+> gamepad UIs, drive it yourself via `clay_nav_scroll_into_view`; don't call
+> `Clay_UpdateScrollContainers()`.
 
 ---
 

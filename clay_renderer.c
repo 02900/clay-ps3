@@ -15,12 +15,43 @@
 #include <stdlib.h>
 
 #include <ppu-types.h>
+#include <rsx/rsx.h>
 #include <ya2d/ya2d.h>
 #include "ttf_render.h"
 
 #define CLAY_IMPLEMENTATION
 #include "clay.h"
 #include "clay_renderer.h"
+
+/* Clay layout space (set in clay_backend_init) -> physical framebuffer scaling.
+ * rsxSetScissor takes physical pixels, but Clay boxes are in the 2D layout space
+ * mapped to the screen by tiny3d_Project2D(). */
+static float clay_layout_w = 848.0f;
+static float clay_layout_h = 512.0f;
+
+/* Scissor (clip) stack for nested SCISSOR_START/END. Rects are physical pixels. */
+typedef struct { u16 x, y, w, h; } clay_scissor_t;
+static clay_scissor_t scissor_stack[8];
+static int scissor_depth = 0;
+
+static u16 clay_clampu16(float v)
+{
+    if (v < 0.0f) return 0;
+    if (v > 65535.0f) return 65535;
+    return (u16)v;
+}
+
+static void clay_scissor_apply(clay_scissor_t s)
+{
+    gcmContextData *ctx = (gcmContextData *)tiny3d_Get_GCM_Context();
+    rsxSetScissor(ctx, s.x, s.y, s.w, s.h);
+}
+
+static clay_scissor_t clay_scissor_full(void)
+{
+    clay_scissor_t s = { 0, 0, (u16)Video_Resolution.width, (u16)Video_Resolution.height };
+    return s;
+}
 
 /* Map a Clay fontSize (px height) to the TTF renderer's sw/sh character size. */
 static void clay_font_dims(uint16_t font_size, int *sw, int *sh)
@@ -78,12 +109,23 @@ void clay_backend_init(int screen_w, int screen_h)
     Clay_Dimensions dims = { (float)screen_w, (float)screen_h };
     Clay_ErrorHandler handler = { clay_error_handler, NULL };
 
+    clay_layout_w = (float)screen_w;
+    clay_layout_h = (float)screen_h;
+
     Clay_Initialize(arena, dims, handler);
     Clay_SetMeasureTextFunction(clay_measure_text, NULL);
 }
 
 void clay_render(Clay_RenderCommandArray commands)
 {
+    float sx = (float)Video_Resolution.width  / clay_layout_w;
+    float sy = (float)Video_Resolution.height / clay_layout_h;
+
+    /* Start each frame with a full-screen clip. */
+    scissor_depth = 0;
+    scissor_stack[0] = clay_scissor_full();
+    clay_scissor_apply(scissor_stack[0]);
+
     for (int32_t i = 0; i < commands.length; i++) {
         Clay_RenderCommand *cmd = Clay_RenderCommandArray_Get(&commands, i);
         Clay_BoundingBox bb = cmd->boundingBox;
@@ -132,10 +174,39 @@ void clay_render(Clay_RenderCommandArray commands)
             }
             break;
         }
+        case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
+            /* Intersect the requested clip with the current one, push, apply. */
+            float x0 = bb.x * sx, y0 = bb.y * sy;
+            float x1 = (bb.x + bb.width) * sx, y1 = (bb.y + bb.height) * sy;
+            clay_scissor_t cur = scissor_stack[scissor_depth];
+            float cx0 = cur.x, cy0 = cur.y;
+            float cx1 = (float)cur.x + cur.w, cy1 = (float)cur.y + cur.h;
+            if (x0 < cx0) x0 = cx0;
+            if (y0 < cy0) y0 = cy0;
+            if (x1 > cx1) x1 = cx1;
+            if (y1 > cy1) y1 = cy1;
+            if (x1 < x0) x1 = x0;
+            if (y1 < y0) y1 = y0;
+            clay_scissor_t s;
+            s.x = clay_clampu16(x0);
+            s.y = clay_clampu16(y0);
+            s.w = clay_clampu16(x1 - x0);
+            s.h = clay_clampu16(y1 - y0);
+            if (scissor_depth < 7) scissor_stack[++scissor_depth] = s;
+            clay_scissor_apply(scissor_stack[scissor_depth]);
+            break;
+        }
+        case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END: {
+            if (scissor_depth > 0) scissor_depth--;
+            clay_scissor_apply(scissor_stack[scissor_depth]);
+            break;
+        }
         default:
-            /* SCISSOR / OVERLAY / CUSTOM / NONE: unused in the layout-only demo.
-             * Hook clipping (gcm scissor) here if scrolling content is added. */
+            /* OVERLAY / CUSTOM / NONE: not used. */
             break;
         }
     }
+
+    /* Restore a full-screen clip so non-Clay drawing after this isn't clipped. */
+    clay_scissor_apply(clay_scissor_full());
 }
