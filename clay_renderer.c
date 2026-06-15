@@ -175,10 +175,14 @@ void clay_render(Clay_RenderCommandArray commands)
             break;
         }
         case CLAY_RENDER_COMMAND_TYPE_SCISSOR_START: {
-            /* Intersect the requested clip with the current one, push, apply. */
+            /* Intersect the requested clip with the current one. Depth is always
+             * tracked (so SCISSOR_END stays balanced); the rect is only stored while
+             * the stack has room. Beyond capacity we still apply the computed
+             * intersection but can't persist it (degrades gracefully for >8 nesting). */
+            int top = scissor_depth < 8 ? scissor_depth : 7;
+            clay_scissor_t cur = scissor_stack[top];
             float x0 = bb.x * sx, y0 = bb.y * sy;
             float x1 = (bb.x + bb.width) * sx, y1 = (bb.y + bb.height) * sy;
-            clay_scissor_t cur = scissor_stack[scissor_depth];
             float cx0 = cur.x, cy0 = cur.y;
             float cx1 = (float)cur.x + cur.w, cy1 = (float)cur.y + cur.h;
             if (x0 < cx0) x0 = cx0;
@@ -192,13 +196,14 @@ void clay_render(Clay_RenderCommandArray commands)
             s.y = clay_clampu16(y0);
             s.w = clay_clampu16(x1 - x0);
             s.h = clay_clampu16(y1 - y0);
-            if (scissor_depth < 7) scissor_stack[++scissor_depth] = s;
-            clay_scissor_apply(scissor_stack[scissor_depth]);
+            scissor_depth++;
+            if (scissor_depth < 8) scissor_stack[scissor_depth] = s;
+            clay_scissor_apply(s);
             break;
         }
         case CLAY_RENDER_COMMAND_TYPE_SCISSOR_END: {
             if (scissor_depth > 0) scissor_depth--;
-            clay_scissor_apply(scissor_stack[scissor_depth]);
+            clay_scissor_apply(scissor_stack[scissor_depth < 8 ? scissor_depth : 7]);
             break;
         }
         default:

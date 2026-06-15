@@ -65,20 +65,24 @@ Clay_Vector2 clay_nav_scroll_into_view(const ClayNav *nav, Clay_ElementId viewpo
     }
 
     /* boundingBox is the on-screen (post-offset) rect, so the delta needed to bring
-     * the focused element into the viewport applies directly to childOffset. */
+     * the focused element into the viewport applies directly to childOffset. When the
+     * element (plus margins) is larger than the viewport, align its leading edge instead
+     * of thrashing between the two edges every frame. */
     float ftop = f.boundingBox.y - margin;
     float fbot = f.boundingBox.y + f.boundingBox.height + margin;
     float vtop = v.boundingBox.y;
     float vbot = v.boundingBox.y + v.boundingBox.height;
-    if (ftop < vtop)      offset.y += (vtop - ftop);
-    else if (fbot > vbot) offset.y -= (fbot - vbot);
+    if ((fbot - ftop) > (vbot - vtop)) offset.y += (vtop - ftop);
+    else if (ftop < vtop)              offset.y += (vtop - ftop);
+    else if (fbot > vbot)              offset.y -= (fbot - vbot);
 
     float fleft  = f.boundingBox.x - margin;
     float fright = f.boundingBox.x + f.boundingBox.width + margin;
     float vleft  = v.boundingBox.x;
     float vright = v.boundingBox.x + v.boundingBox.width;
-    if (fleft < vleft)       offset.x += (vleft - fleft);
-    else if (fright > vright) offset.x -= (fright - vright);
+    if ((fright - fleft) > (vright - vleft)) offset.x += (vleft - fleft);
+    else if (fleft < vleft)                  offset.x += (vleft - fleft);
+    else if (fright > vright)                offset.x -= (fright - vright);
 
     return offset;
 }
@@ -183,6 +187,9 @@ ClayNavDir clay_nav_repeat(ClayNavRepeat *r, ClayNavDir held,
                            int initial_delay, int repeat_rate) {
     if (repeat_rate < 1) {
         repeat_rate = 1;
+    }
+    if (initial_delay < 0) {
+        initial_delay = 0;
     }
 
     if (held == CLAY_NAV_NONE) {
