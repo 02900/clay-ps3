@@ -42,6 +42,8 @@ typedef enum {
 typedef struct {
     Clay_ElementId focused;            /* currently focused element */
     bool           has_focus;          /* false until the first element is registered */
+    bool           wrap;               /* if true, moving past an edge wraps to the
+                                          opposite end (default false; opt-in) */
     Clay_ElementId items[CLAY_NAV_MAX];/* focusables registered this frame */
     int            count;
 } ClayNav;
@@ -59,7 +61,9 @@ bool clay_nav_is_focused(const ClayNav *nav, Clay_ElementId id);
 
 /* Move focus in `dir`, choosing the nearest registered element in that direction
  * using each element's previous-frame bounding box (Clay_GetElementData).
- * No-op for CLAY_NAV_NONE or when no candidate exists in that direction. */
+ * No-op for CLAY_NAV_NONE. If no candidate exists in that direction and nav->wrap
+ * is true, focus wraps to the element at the opposite edge (best for linear menus);
+ * otherwise focus stays put. */
 void clay_nav_move(ClayNav *nav, ClayNavDir dir);
 
 /* Force focus to a specific element (e.g. restoring focus after a state change).

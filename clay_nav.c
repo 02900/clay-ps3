@@ -107,6 +107,39 @@ void clay_nav_move(ClayNav *nav, ClayNavDir dir) {
         }
     }
 
+    /* Nothing ahead: optionally wrap to the element at the opposite edge. */
+    if (!found_best && nav->wrap) {
+        for (int i = 0; i < nav->count; i++) {
+            Clay_ElementId cand = nav->items[i];
+            if (clay_nav__same(cand, nav->focused)) {
+                continue;
+            }
+            Clay_ElementData cd = Clay_GetElementData(cand);
+            if (!cd.found) {
+                continue;
+            }
+            Clay_Vector2 to = clay_nav__center(cd.boundingBox);
+
+            /* Score = how far toward the opposite edge (primary) + alignment (perp).
+             * e.g. pressing DOWN with nothing below -> pick the topmost (min y). */
+            float primary, perp;
+            switch (dir) {
+                case CLAY_NAV_UP:    primary =  to.y; perp = clay_nav__absf(to.x - from.x); break;
+                case CLAY_NAV_DOWN:  primary = -to.y; perp = clay_nav__absf(to.x - from.x); break;
+                case CLAY_NAV_LEFT:  primary =  to.x; perp = clay_nav__absf(to.y - from.y); break;
+                case CLAY_NAV_RIGHT: primary = -to.x; perp = clay_nav__absf(to.y - from.y); break;
+                default: continue;
+            }
+
+            float score = primary + CLAY_NAV_PERP_WEIGHT * perp;
+            if (!found_best || score < best_score) {
+                found_best = true;
+                best_score = score;
+                best = cand;
+            }
+        }
+    }
+
     if (found_best) {
         nav->focused = best;
         nav->has_focus = true;

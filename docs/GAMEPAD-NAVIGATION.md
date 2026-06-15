@@ -118,6 +118,7 @@ typedef enum { CLAY_NAV_NONE, CLAY_NAV_UP, CLAY_NAV_DOWN, CLAY_NAV_LEFT, CLAY_NA
 typedef struct {
     Clay_ElementId focused;
     bool           has_focus;
+    bool           wrap;                   // opt-in: wrap focus past edges (default off)
     Clay_ElementId items[CLAY_NAV_MAX];   // CLAY_NAV_MAX defaults to 256
     int            count;
 } ClayNav;
@@ -153,6 +154,18 @@ lies in the pressed direction (correct half-plane) and scores it as
 This means a single function handles **rows, columns, grids, and irregular layouts** — no
 manual column-count math. Tune `CLAY_NAV_PERP_WEIGHT` (default `2.0`) in `clay_nav.c`:
 higher values prefer candidates directly in line with the current element.
+
+By default movement stops at the edges (pressing Down on the last element does nothing).
+For short **linear menus**, edge wrapping often feels better — set `nav.wrap = true` and
+`clay_nav_move` will jump to the element at the opposite edge when there's nothing ahead:
+
+```c
+ClayNav nav = {0};
+nav.wrap = true;     // Down on the last row -> first row, Up on the first -> last
+```
+
+Leave it off (the default) for 2D grids, where wrapping across rows/columns is usually
+disorienting.
 
 ---
 
